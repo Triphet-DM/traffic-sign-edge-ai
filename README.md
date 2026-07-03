@@ -18,7 +18,7 @@
 
 > This is **not** "I trained YOLO and ran it on a Pi." It is a year-long study of **deployment engineering under constrained hardware**: backend characterization, low-precision inference investigation, post-export validation, runtime benchmarking, and a cognitive decision architecture that decides *whether the driver should be interrupted at all*. The system performs **attention redirection** for a human-in-the-loop driver — it does not drive.
 
-*"DualVision" = a dual-camera design — a forward traffic-sign camera (built) plus a **planned** driver-monitoring camera (14). Only the traffic-sign vision is implemented today; this is not a stereo rig.*
+*"DualVision" = a dual-camera design — a forward traffic-sign camera (built) plus a **planned** driver-monitoring camera (§14). Only the traffic-sign vision is implemented today; this is not a stereo rig.*
 
 ![Live on-device detection — speed-limit 90 with runtime telemetry on the Raspberry Pi 5](README_assets/sign_90.png)
 
