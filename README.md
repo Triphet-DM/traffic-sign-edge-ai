@@ -38,7 +38,7 @@ https://github.com/user-attachments/assets/ae2531b6-3ab8-476e-abaf-a1c68d431d60
 
 ---
 
-## 1. Overview
+## 1. Overview 
 
 A real-time, **offline** edge-AI assistant on a Raspberry Pi 5. A forward camera detects and reads traffic signs; an audio channel speaks **only** what deserves the driver's attention. The engineering thesis is a **cognitive attention scheduler** — the contended resource is the **driver's attention** (one spoken notification at a time), not CPU. Perception, decision, and audio all run **on-device, with no cloud or network dependency**.
 
