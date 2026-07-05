@@ -5,7 +5,7 @@
   TODO markers = data the saved notes never captured (fill before publishing).
 -->
 
-# Embedded Cognitive Driver Assistance on Raspberry Pi 5 
+# Embedded Cognitive Driver Assistance on Raspberry Pi 5
 
 ![Platform](https://img.shields.io/badge/Platform-Raspberry%20Pi%205-C51A4A?logo=raspberrypi&logoColor=white)
 ![Language](https://img.shields.io/badge/C%2B%2B-17-00599C?logo=cplusplus&logoColor=white)
