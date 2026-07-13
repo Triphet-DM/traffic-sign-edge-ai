@@ -90,11 +90,14 @@ struct TemporalVoter {
         result.winner       = best_class;
         result.winner_count = best_count;
 
+        // Confirm ONLY on real evidence: the leader must reach early_confirm_votes_
+        // within the rolling window. The old "window full (history >= max_frames)
+        // → confirm the leader even with 1 vote" fallback was REMOVED 2026-07-13:
+        // at 18 FPS a 10-frame window fills in ~0.56 s, so a single far-away
+        // detection could force a confirm and cry-wolf on the first (K-less) Acquire.
+        // Below threshold now = stay silent (winner=""). max_frames_ is still the
+        // rolling-window size (a class has that many frames to reach the threshold).
         if (best_count >= early_confirm_votes_) {
-            result.confirmed = true;
-            return result;
-        }
-        if (result.history_size >= max_frames_) {
             result.confirmed = true;
             return result;
         }
@@ -238,6 +241,7 @@ static AppConfig parse_args(int argc, char** argv) {
         else if (key == "--shadow-k")        cfg.shadow_k             = std::stoi(value(key));
         else if (key == "--shadow-rearm-ms") cfg.shadow_rearm_ms      = std::stoi(value(key));
         else if (key == "--shadow-reminder-sec") cfg.shadow_reminder_sec = std::stoi(value(key));
+        else if (key == "--early-confirm")   cfg.early_confirm_votes = std::stoi(value(key));
         else if (key == "--audio")           cfg.audio            = true;
         else if (key == "--audio-dir")       cfg.audio_dir        = value(key);
         else if (key == "--audio-device")    cfg.audio_device     = value(key);
@@ -256,9 +260,10 @@ static AppConfig parse_args(int argc, char** argv) {
                       << "  --no-draw        skip overlay drawing for lowest CPU use\n"
                       << "  --shadow         (no-op; L1/L2/L3 pipeline is the authority since cutover)\n"
                       << "  --shadow-verbose log SUPPRESS events from the L1/L2/L3 pipeline\n"
-                      << "  --shadow-k <n>            L2 K-hysteresis (default 1)\n"
+                      << "  --shadow-k <n>            L2 K-hysteresis (default 2)\n"
                       << "  --shadow-rearm-ms <ms>    L1 re-arm timeout (default 600)\n"
                       << "  --shadow-reminder-sec <s> L3 reminder cooldown (default 180)\n"
+                      << "  --early-confirm <n>       voter votes needed to confirm (default 4)\n"
                       << "  --audio          play audio on speed announce\n"
                       << "  --audio-dir <d>     wav directory (default ../assets/audio)\n"
                       << "  --audio-device <d>  ALSA device for aplay (default plughw:0,0)\n";
@@ -473,6 +478,21 @@ static DecisionResult run_decision(
                 std::cout << "[CLS] low_conf=" << cv::format("%.2f", cls_conf)
                           << " keep_voter=" << output << "\n" << std::flush;
             }
+
+            // [CONFIRM] evidence snapshot (2026-07-13): vote strength + spread +
+            // ROI size (distance proxy) + CLS conf. Shows how strong each confirm
+            // was and how long a real sign took to reach the vote threshold.
+            std::cout << "[CONFIRM F" << frame_index << "]"
+                      << " voter=" << result.vote.winner
+                      << " count=" << result.vote.winner_count
+                      << " votes={";
+            for (const auto& kv : result.vote.votes)
+                std::cout << kv.first << ":" << kv.second << " ";
+            std::cout << "} cls=" << output
+                      << " cls_conf=" << cv::format("%.2f", cls_conf)
+                      << " roi=" << win_roi.box.width << "x" << win_roi.box.height
+                      << " yolo=" << cv::format("%.2f", win_roi.yolo_conf)
+                      << "\n" << std::flush;
         }
 
         roi_by_class.clear();   // เคลียร์ ROI ทุก class — เริ่ม window ใหม่ พร้อม voter.reset()
@@ -760,7 +780,7 @@ int main(int argc, char** argv) {
         }
 
         TimingAverages avg(cfg.avg_window);
-        TemporalVoter   voter(10, 4);
+        TemporalVoter   voter(10, cfg.early_confirm_votes);
 
         // ROI ต่อ class — เก็บ crop คมชัดที่สุดของแต่ละ class ระหว่าง voting window
         // key = class name → classifier อ่าน roi_by_class[winner] ตอน confirm

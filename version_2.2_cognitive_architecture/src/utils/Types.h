@@ -87,6 +87,7 @@ struct AppConfig {
     bool use_packing = true;
     bool async_detect = false;
     bool async_camera = false;
+    int  early_confirm_votes = 4;       // --early-confirm: โหวตขั้นต่ำที่ voter ต้องได้ถึง confirm (window=10, ไม่มี fallback)
 
     // L1/L2/L3 pipeline (Step 3) — AUTHORITY after cutover 2026-06-17 (default ON)
     bool shadow              = true;    // legacy --shadow flag kept as no-op; pipeline is now the authority
