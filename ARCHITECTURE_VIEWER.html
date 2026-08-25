@@ -158,6 +158,8 @@
       <button class="txtbtn modebtn" id="editBtn" title="Edit mode — drag nodes to reposition">✏ Edit</button>
       <button class="txtbtn" id="resetBtn" title="Reset this board's layout to default">Reset</button>
       <button class="txtbtn" id="exportBtn" title="Export all layouts as JSON">Export</button>
+      <button class="txtbtn" id="svgBtn" title="Save this board as SVG — vector, stays sharp at any zoom">🖼 SVG</button>
+      <button class="txtbtn" id="pngBtn" title="Save this board as PNG (4x)">🖼 PNG</button>
       <button class="txtbtn" id="importBtn" title="Import layouts from JSON">Import</button>
       <input type="file" id="importInput" accept="application/json,.json" style="display:none" />
       <button class="txtbtn" id="glossaryBtn" title="อภิธานศัพท์ภาษาไทย — Thai glossary">📖 ศัพท์</button>
@@ -494,14 +496,16 @@ BOARDS.push({
     {x:1560,y:90,w:1120,h:260,label:'DECISION ENGINE A — Persistent-State (speed limit) · L1→L2→L3 → shared L4', cls:'dec'},
     {x:1560,y:410,w:1120,h:270,label:'DECISION ENGINE B — Momentary events (10 non-speed signs) · per-class suppression', cls:'shadow'},
     {x:2700,y:100,w:420,h:600,label:'ARBITER → shared L4 → AUDIO THREAD', cls:'audio'},
+    {x:1560,y:700,w:790,h:210,label:'QUALITY AUDIT — background only · NOT in the decision path · see Board 11', cls:'note'},
   ],
   nodes:{
     io_in:{x:40,y:50,w:300,h:60,cls:'note',title:'INPUT — road scene'},
     cam:{x:40,y:160,w:280,h:120,cls:'perc',title:'Camera (sync)',lines:['Picamera2.read() on main','RGB888 → BGR','no async (halves FPS)']},
-    yolo:{x:340,y:160,w:280,h:120,cls:'perc',title:'YOLO Detector · Stage 1',lines:['detects sign REGION only','presence + ROI box (NOT value)','letterbox→ncnn→NMS']},
+    yolo:{x:340,y:160,w:280,h:120,cls:'perc',title:'YOLO11n · Stage 1',lines:['detects sign REGION only','presence + ROI box (NOT value)','imgsz 416 · ncnn · threads 2']},
     det:{x:650,y:178,w:200,h:84,cls:'data',title:'Detection[]',lines:['{box,class,conf}']},
     voter:{x:880,y:160,w:300,h:120,cls:'perc',title:'TemporalVoter',lines:['Detection Stability','= K/N FRAMES (count)','confirm → fire once']},
-    cls:{x:880,y:315,w:300,h:110,cls:'perc',title:'Speed Classifier · Stage 2',lines:['reads speed VALUE from ROI','confirm-then-classify (50/60/…)','feeds Engine A only']},
+    cls:{x:880,y:315,w:300,h:110,cls:'perc',title:'CLS #1 · Speed Classifier',lines:['reads speed VALUE from ROI','confirm-then-classify (50/60/…)','feeds Engine A only']},
+    mcls:{x:1230,y:315,w:300,h:110,cls:'perc',title:'CLS #2 · Momentary Classifier',lines:['5 diamond classes incl. curve L/R','built 08-16 · ncnn == .pt 267/267','returns top-2 · feeds Engine B']},
     router:{x:1230,y:160,w:300,h:120,cls:'dec',title:'BehaviorPolicyRouter',lines:['after confirm','which behavioural policy?','→ which brain']},
     l1:{x:1600,y:130,w:300,h:110,cls:'dec',title:'L1 SignEpisodeLifecycle',lines:['episode + fresh · re-arm']},
     l2:{x:1920,y:130,w:300,h:110,cls:'dec',title:'L2 CurrentSpeedLimitManager',lines:['belief · K-hyst · no-forget']},
@@ -511,6 +515,10 @@ BOARDS.push({
     arb:{x:2720,y:130,w:380,h:225,cls:'infra',title:'Notification Arbiter (stateful)',lines:['SELECT  : highest attention_rank','PREEMPT : rank>cur AND','          rank ≥ INTERRUPT_THRESHOLD','THRESHOLD = lowest safety rank','  (Ped Crossing) ⇒ re-derives Law 2','preempt = kill playing aplay']},
     l4:{x:2720,y:390,w:380,h:120,cls:'audio',title:'shared L4 (single-slot)',lines:['latest-wins','value→wav  /  class→wav']},
     spk:{x:2720,y:550,w:380,h:130,cls:'audio',title:'🔊 Speaker',lines:['aplay → MAX98357A','one voice at a time']},
+
+    rfd:{x:1585,y:745,w:350,h:140,cls:'perc',title:'RF-DETR Auditor',lines:['a SECOND, heavier detector','backbone → V3D GPU · decoder → CPU','19 s / image · sampled on a timer','decoder MUST be 1 thread (see note)']},
+    rfcmp:{x:1965,y:745,w:360,h:140,cls:'data',title:'What it is FOR',lines:['re-checks frames YOLO already saw','⇒ finds signs YOLO MISSED','evidence of detector quality','NEVER announces · NEVER steers']},
+    brain3:{x:2390,y:745,w:290,h:140,cls:'note',title:'Brain 3 — Drowsiness',lines:['2nd camera · FaceMesh + EAR','design locked · compute gate PASS','NOT IMPLEMENTED YET','parked by advisor 07-03']},
   },
   edges:[
     {from:'io_in',to:'cam'},
@@ -519,6 +527,10 @@ BOARDS.push({
     {from:'voter',to:'cls',label:'on confirm',fromSide:'bottom',toSide:'top'},
     {from:'voter',to:'router',label:'confirmed sign'},
     {from:'cls',to:'router',label:'speed value',dash:true,fromSide:'right',toSide:'bottom'},
+    {from:'router',to:'mcls',label:'on confirm · non-speed',dash:true,fromSide:'bottom',toSide:'top'},
+    {from:'mcls',to:'mom',label:'refined class (top-2)',dash:true,fromSide:'right',toSide:'left',cls:'shadow'},
+    {from:'det',to:'rfd',label:'full frame · timer-sampled · off the decision path',dash:true,fromSide:'bottom',toSide:'left',cls:'note'},
+    {from:'rfd',to:'rfcmp'},
     {from:'router',to:'l1',label:'speed family',fromSide:'right',toSide:'left',cls:'dec'},
     {from:'router',to:'mom',label:'non-speed · 10 classes',fromSide:'bottom',toSide:'left',cls:'shadow'},
     {from:'l1',to:'l2'},{from:'l2',to:'l3'},
@@ -535,7 +547,7 @@ BOARDS.push({
     {x:810,y:495,w:370,cls:'note',title:'Attention ranking (provisional #s · re-ranked 06-17)',lines:['School Zone 30 · Ped-Warning 25','Ped-Crossing 20 = THRESHOLD','Speed CHANGE 12 · Curve 10 · Crossroad 8','Restrictions 4 · Speed REMINDER 2']},
     {x:1200,y:495,w:330,cls:'note',title:'3 integration refactors · DONE',lines:['1 · extract shared L4 from facade','2 · two wav maps (value→ / class→)','3 · kill-aplay preempt + re-delivery']},
     {x:30,y:715,w:540,cls:'infra',title:'Engineering Challenges Solved',lines:['Embedded Python (Picamera2) + GIL management','NCNN thread benchmarking — threads=2 optimal','Async halved throughput → sync pipeline chosen','CPU-contention analysis · dropped-frame handling']},
-    {x:600,y:715,w:480,cls:'audio',title:'Performance Snapshot — Raspberry Pi 5 (8GB)',lines:['~18 FPS sustained · infer ~48 ms/frame','CPU ~50–60% · imgsz 512 · NCNN fp32','threads=2 · sync pipeline · packing on']},
+    {x:600,y:715,w:480,cls:'audio',title:'Performance — MEASURED 08-19, re-measured 08-24',lines:['29.8 FPS · infer 30.1 ms · p99 33.3 ms','imgsz 416 · NCNN fp32 · threads=2 · sync','9,404 frames total · 0 dropped · no throttle','camera-capped at 30 FPS, not CPU-capped']},
     {x:1110,y:715,w:420,cls:'perc',title:'Deployment — Fully On-Device',lines:['Raspberry Pi 5 · offline inference','NO cloud / NO network dependency','real-time execution at the edge']},
   ],
 });
@@ -943,6 +955,51 @@ BOARDS.push({
   ],
 });
 
+/* ---------- BOARD 11 — RF-DETR QUALITY AUDITOR ---------- */
+BOARDS.push({
+  id:'b11', group:'Overview', name:'11 · RF-DETR Auditor', icon:'#63e6be',
+  title:'Board 11 — RF-DETR Quality Auditor',
+  sub:'a second detector that grades the first · runs in the background · never announces · all numbers measured on the Pi, dated',
+  W:2760, H:1080,
+  regions:[
+    {x:20,y:110,w:1360,h:330,label:'THE SPLIT — one model, two processors', cls:'perc'},
+    {x:20,y:600,w:1360,h:400,label:'PROOF THE SPLIT IS EXACT — one variable at a time (08-18)', cls:'dec'},
+    {x:1420,y:110,w:1310,h:330,label:'WHY SPLIT AT ALL — it is NOT for speed', cls:'shadow'},
+    {x:1420,y:600,w:1310,h:400,label:'THE COST OF RUNNING IT — measured 08-19', cls:'audio'},
+  ],
+  nodes:{
+    purpose:{x:40,y:40,w:900,h:56,cls:'note',title:'PURPOSE — find the signs the shipping detector MISSED. It grades YOLO. It never speaks, never steers, never enters the decision path.'},
+
+    frame:{x:45,y:160,w:240,h:120,cls:'data',title:'Full frame',lines:['sampled on a timer','no queue anywhere','~2 % far-sign risk accepted']},
+    bb:{x:320,y:160,w:330,h:150,cls:'perc',title:'Backbone → V3D GPU',lines:['ncnn-Vulkan on the Pi GPU','86.7 % of the whole model','all three fp16 options OFF','(fp16 on ⇒ cosine 0.63 = wrong)']},
+    dec:{x:690,y:160,w:330,h:150,cls:'perc',title:'Decoder → CPU',lines:['onnxruntime · 631 nodes · 16.5 MB','cut out of the graph 08-18','had NEVER been cut before that','🔴 intra_op_num_threads = 1']},
+    out:{x:1060,y:160,w:290,h:120,cls:'data',title:'Boxes + classes',lines:['compared against YOLO','⇒ what YOLO missed']},
+
+    v1:{x:45,y:660,w:410,h:130,cls:'dec',title:'Route 1 — ORT backbone → decoder',lines:['100 / 100 images identical','⇒ THE CUT ITSELF IS EXACT','so any later error is not the cut']},
+    v2:{x:485,y:660,w:410,h:130,cls:'dec',title:'Route 2 — ncnn backbone → decoder',lines:['99 / 100','⇒ the 1 image is ncnn ALONE','same query, 0.0056 across the 0.50 line']},
+    v3:{x:925,y:660,w:425,h:130,cls:'dec',title:'Route 3 — on the real board',lines:['CPU 9/10 · GPU (V3D) 3/3','GPU cosine 0.99999831','md5-identical files both sides']},
+    barnote:{x:45,y:825,w:1305,h:140,cls:'note',title:'The one CPU failure was reported as a failure',lines:['IoU 0.98975 against a 0.99 bar that was written down BEFORE the run — a gap of 0.05 pixel on a 13.6-pixel box.','The bar was NOT moved after seeing the data. Reporting it as a pass would have been the easier and wronger choice.','⭐ Unexplained and left unexplained: the GPU path is ~40× numerically CLOSER to the x86 reference than the ARM CPU path.','   (1−cosine 1.7e-6 vs 6.4e-5, same 3 images.) Cause NOT proven ⇒ the number is quoted, no mechanism is claimed.']},
+
+    speed:{x:1445,y:160,w:600,h:150,cls:'shadow',title:'Speed: the split LOSES, badly',lines:['whole model on CPU (ORT)     457 ms','split, both halves on CPU     506 ms','split, backbone on the GPU  19,096 ms  ← 42× SLOWER','⇒ there is no speed argument. Do not make one.']},
+    why:{x:2075,y:160,w:630,h:150,cls:'shadow',title:'The real argument: do not steal the CPU',lines:['The auditor runs BESIDE a detector that must not slow down.','Wall-clock does not matter — it runs in the background.','What matters is how much CPU it takes away.','CPU work per image: 457 ms → 42 ms once the backbone leaves.']},
+
+    seam:{x:1445,y:660,w:660,h:200,cls:'audio',title:'How much does it hurt the detector?',lines:['arm4  nothing set,   4 threads   →  55.4 frames lost · 7 in a row','arm5  taskset -c 3,  4 threads   →  33.6 frames lost · 2 in a row','arm6  1 thread                   →   1.9 frames lost · 1 in a row  ✅','','Threads are the lever, NOT core pinning: taskset time-shares one','core but all 4 threads still queue at the memory controller.']},
+    silent:{x:2135,y:660,w:570,h:200,cls:'note',title:'Why this was worth hunting',lines:['The voter needs 4 votes from a 10-frame window.','7 lost frames in a row silences a distant sign —','with no error, no log line, and drop = 0 the whole time.','','The instrument reported a clean number while blind.','⇒ the rule now lives in an assert, not only in a comment.']},
+    price:{x:1445,y:880,w:1260,h:90,cls:'note',title:'The price that is paid, stated plainly',lines:['19 s per audited image ⇒ ~75–100 images audited per driving hour instead of ~189. Accepted deliberately, because the alternative — auditing on the CPU — costs the shipping detector 18.7 % of its frames at the gentlest setting Linux offers (SCHED_IDLE, 1 thread) and 68.9 % at full tilt.']},
+  },
+  edges:[
+    {from:'frame',to:'bb'},{from:'bb',to:'dec',label:'features'},{from:'dec',to:'out'},
+    {from:'v1',to:'v2',label:'isolate ncnn',dash:true},{from:'v2',to:'v3',label:'move to the board',dash:true},
+  ],
+  notes:[
+    {x:20,y:1000,w:1360,cls:'infra',title:'Status — what is done and what is not',lines:[
+      'DONE: the model is cut, assembled, and runs on the Pi on both processors, with the split proven exact.',
+      'NOT DONE: the auditor program itself is not written. What exists is the measurement telling us how to write it.',
+      'NOT DONE: retrain at 512 (RF-DETR Small locks resolution to the size class — the older 384 timings do not carry over).',
+      'STILL OWED: the CPU-offload figure measured against the real model in the same unit as arm6, so it can sit beside "1.9 frames".']},
+  ],
+});
+
 /* ============================================================
    UI wiring
    ============================================================ */
@@ -1136,6 +1193,75 @@ document.getElementById('exportBtn').onclick=()=>{
   const blob=new Blob([JSON.stringify(out,null,2)],{type:'application/json'});
   const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
   a.download='architecture_layout.json'; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+};
+
+// ---- Save current board as SVG / PNG -------------------------------------
+// PanZoom แตะแค่ viewBox ของ scene ดังนั้น export ต้องรีเซ็ต viewBox กลับเป็นทั้งบอร์ด
+// สีทั้งหมดเป็น attribute อยู่แล้ว ที่มาจาก CSS ของหน้ามีแค่ font-family กับ var(--panel)
+// จึงยัด <style> ตัวเล็กๆ เข้าไปในไฟล์ที่ export ให้มันยืนได้ด้วยตัวเอง
+function boardSVG(){
+  const dom=DOMB[activeId]; if(!dom) return null;
+  const src=dom.svg;
+  const W=+src.getAttribute('data-w'), H=+src.getAttribute('data-h');
+  const c=src.cloneNode(true);
+  c.removeAttribute('class');
+  c.setAttribute('viewBox','0 0 '+W+' '+H);
+  c.setAttribute('width',W); c.setAttribute('height',H);
+  c.setAttribute('xmlns','http://www.w3.org/2000/svg');
+  const NS='http://www.w3.org/2000/svg';
+  const st=document.createElementNS(NS,'style');
+  st.textContent="svg{--panel:#ffffff;--panel2:#f1f3f5;--bg:#ffffff;--ink:#1d1d20;"
+                +"--ink2:#5a5f66;--line:#dee2e6;--accent:#7048e8}"
+                +"text{font-family:Inter,system-ui,'Segoe UI',Roboto,Arial,sans-serif}";
+  // Word รองรับ SVG แบบจำกัด: ไม่รู้จัก filter และอ่าน CSS ใน <style> ไม่ครบ
+  // filter ตัวนี้ตั้ง scale="0" อยู่แล้ว = ไม่มีผลทางสายตา ตัดทิ้งได้ไม่เสียอะไร
+  c.querySelectorAll('[filter]').forEach(el=>el.removeAttribute('filter'));
+  c.querySelectorAll('filter').forEach(el=>el.remove());
+  // ยัด font ลงไปทีละ element ไม่พึ่ง CSS
+  c.querySelectorAll('text').forEach(el=>{
+    const f=el.getAttribute('style')||'';
+    if(f.indexOf('font-family')<0)
+      el.setAttribute('style', f+(f&&!f.endsWith(';')?';':'')
+        +"font-family:Inter,'Segoe UI',Arial,sans-serif");
+  });
+  const bg=document.createElementNS(NS,'rect');
+  bg.setAttribute('x','0'); bg.setAttribute('y','0');
+  bg.setAttribute('width',W); bg.setAttribute('height',H); bg.setAttribute('fill','#ffffff');
+  c.insertBefore(bg,c.firstChild);
+  c.insertBefore(st,c.firstChild);
+  // ตัว render SVG หลายตัว (Word เป็นตัวหลัก) ไม่รู้จัก var() ถ้า resolve ไม่ได้
+  // fill จะตกกลับไปเป็นสีดำ จึงแทนค่าสีจริงลงไปเลย ไม่ให้เหลือ var() ในไฟล์
+  const VARS={'var(--panel2)':'#f1f3f5','var(--panel)':'#ffffff','var(--bg)':'#ffffff',
+              'var(--ink2)':'#5a5f66','var(--ink)':'#1d1d20','var(--line)':'#dee2e6',
+              'var(--accent)':'#7048e8'};
+  let xml=new XMLSerializer().serializeToString(c);
+  Object.keys(VARS).forEach(k=>{ xml=xml.split(k).join(VARS[k]); });
+  return {xml:xml, W:W, H:H};
+}
+function saveBlob(blob,name){
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+  a.download=name; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),2000);
+}
+document.getElementById('svgBtn').onclick=()=>{
+  const o=boardSVG(); if(!o) return;
+  saveBlob(new Blob([o.xml],{type:'image/svg+xml;charset=utf-8'}), activeId+'.svg');
+};
+document.getElementById('pngBtn').onclick=()=>{
+  const o=boardSVG(); if(!o) return;
+  let k=4;                                   // 4 เท่า แต่กันไม่ให้ canvas ใหญ่เกินที่เบราว์เซอร์ไหว
+  while(k>1 && (o.W*k>16000 || o.H*k>16000 || o.W*k*o.H*k>1.2e8)) k--;
+  const img=new Image();
+  img.onload=()=>{
+    const cv=document.createElement('canvas');
+    cv.width=Math.round(o.W*k); cv.height=Math.round(o.H*k);
+    const g=cv.getContext('2d');
+    g.fillStyle='#ffffff'; g.fillRect(0,0,cv.width,cv.height);
+    g.drawImage(img,0,0,cv.width,cv.height);
+    cv.toBlob(b=>{ if(b) saveBlob(b, activeId+'@'+k+'x.png');
+                   else alert('สร้าง PNG ไม่สำเร็จ ลองใช้ปุ่ม SVG แทน'); },'image/png');
+  };
+  img.onerror=()=>alert('แปลงเป็น PNG ไม่สำเร็จ ใช้ปุ่ม SVG แทนได้ครับ');
+  img.src='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(o.xml);
 };
 const importInput=document.getElementById('importInput');
 document.getElementById('importBtn').onclick=()=> importInput.click();
